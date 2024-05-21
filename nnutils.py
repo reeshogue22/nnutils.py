@@ -8,9 +8,8 @@ import torch
 # 1. RMSNorm
 # 2. GeGLU
 # 3. ReluSquared
-# 4. MLP
+# 4. GeGLUMLP
 # 5. CausalConv1d
-# 6. ModernizedLSTM
 
 class RMSNorm(torch.nn.Module):
     def __init__(self, indims, epsilon=1e-8):
@@ -32,7 +31,7 @@ class ReluSquared(torch.nn.Module):
     def forward(self, x):
         return torch.relu(x)*torch.relu(x)
 
-class MLP(torch.nn.Module):
+class GeGLUMLP(torch.nn.Module):
     def __init__(self, indims, hiddims, outdims):
         super().__init__()
         self.geglu = GeGLU(indims, hiddims)
@@ -50,25 +49,3 @@ class CausalConv1d(torch.nn.Module):
         x = torch.nn.functional.pad(x, (self.conv.kernel_size[0]-1, 0))
         x = self.conv(x)
         return x
-    
-class ModernizedLSTM(torch.nn.Module):
-    def __init__(self, indims):
-        super().__init__()
-        self.indims = indims
-        self.lstm = torch.nn.LSTM(indims, indims)
-        self.norm = RMSNorm(indims)
-        self.projection = torch.nn.Linear(indims, indims)
-        self.r_projection = torch.nn.Linear(indims, indims, bias=False)
-        self.q_projection = torch.nn.Linear(indims, indims, bias=False)
-    def forward(self, x, hidden=None):
-        res = x
-        x = self.norm(x)
-        q = self.q_projection(x)
-        r = torch.sigmoid(self.r_projection(x))
-
-        x, hidden = self.lstm(q, hidden)
-        x = x * r
-
-        x = self.projection(x)
-
-        return x, hidden
